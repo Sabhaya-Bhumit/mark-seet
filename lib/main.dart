@@ -1,7 +1,9 @@
-import 'package:demo/helpexs/post_api_helper.dart';
-import 'package:demo/post.dart';
-import 'package:demo/weather.dart';
+import 'package:demo/global.dart';
+import 'package:demo/map_sreen.dart';
 import 'package:flutter/material.dart';
+import 'package:geocoding/geocoding.dart';
+import 'package:geolocator/geolocator.dart';
+import 'package:permission_handler/permission_handler.dart';
 
 void main() {
   runApp(
@@ -10,15 +12,11 @@ void main() {
       initialRoute: 'weather',
       routes: {
         '/': (context) => home(),
-        'sreen': (context) => sreen(),
-        'weather': (context) => weather(),
+        'map': (context) => map(),
       },
     ),
   );
 }
-
-List<Post>? data;
-int number = 0;
 
 class home extends StatefulWidget {
   const home({Key? key}) : super(key: key);
@@ -27,98 +25,60 @@ class home extends StatefulWidget {
   State<home> createState() => _homeState();
 }
 
-final TextEditingController search = TextEditingController();
+Placemark? current;
 
 class _homeState extends State<home> {
+  @override
+  void initState() {
+    // TODO: implement initState
+    super.initState();
+    Permission.location.request();
+  }
+
   @override
   Widget build(BuildContext context) {
     double _height = MediaQuery.of(context).size.height;
     double _widht = MediaQuery.of(context).size.width;
     return Scaffold(
         resizeToAvoidBottomInset: false,
-        appBar: AppBar(title: Text("API"), centerTitle: true),
-        body: Padding(
-          padding: EdgeInsets.symmetric(horizontal: 10),
-          child: Column(
-            children: [
-              TextFormField(
-                controller: search,
-                onSaved: (val) {
-                  setState(() {
-                    PostAPIHelper.postAPIHelper.fetchMultidata(
-                        API:
-                            "https://pixabay.com/api/?key=30579047-59d4d724d23235f6f0ffdf3de&q=${search.text}&per_page=100");
-                  });
-                },
-                decoration: InputDecoration(
-                    border: OutlineInputBorder(), hintText: "EX. red+yellow"),
-              ),
-              FutureBuilder(
-                future: PostAPIHelper.postAPIHelper.fetchMultidata(
-                    API:
-                        "https://pixabay.com/api/?key=30579047-59d4d724d23235f6f0ffdf3de&q=${search.text}&per_page=100"),
-                builder: (context, snapshot) {
-                  if (snapshot.hasError) {
-                    return Center(
-                      child: Text("Error is ${snapshot.error}"),
-                    );
-                  } else if (snapshot.hasData) {
-                    data = snapshot.data;
-                    return SizedBox(
-                      height: _height * 0.82,
-                      child: ListView.separated(
-                          separatorBuilder: (context, index) =>
-                              SizedBox(height: 10),
-                          itemBuilder: (context, i) {
-                            print(data);
-                            return Card(
-                              elevation: 3,
-                              child: ListTile(
-                                trailing: Text(
-                                    "Height : ${data![i].previewHeight}\nWidth : ${data![i].previewWidth}"),
-                                onTap: () {
-                                  setState(() {
-                                    number = i;
-                                    Navigator.of(context).pushNamed('sreen');
-                                  });
-                                },
-                                leading: CircleAvatar(
-                                    radius: 30,
-                                    backgroundImage: NetworkImage(
-                                        "${data![i].largeImageURL}")),
-                                title: Text("${data![i].tags}"),
-                              ),
-                            );
-                          },
-                          itemCount: data!.length),
-                    );
-                  }
-                  return CircularProgressIndicator();
-                },
-              ),
-            ],
-          ),
-        ));
-  }
-}
-
-class sreen extends StatefulWidget {
-  const sreen({Key? key}) : super(key: key);
-
-  @override
-  State<sreen> createState() => _sreenState();
-}
-
-class _sreenState extends State<sreen> {
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
         appBar: AppBar(
-          title: Text("${data![number].tags}"),
+          title: Text("API"),
+          centerTitle: true,
+          actions: [
+            IconButton(
+                onPressed: () {
+                  openAppSettings();
+                },
+                icon: Icon(Icons.settings))
+          ],
         ),
         body: Center(
-          child: Image.network("${data![number].largeImageURL}",
-              fit: BoxFit.fitWidth),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Text("${global.lat}\n${global.long}\n$current"),
+              ElevatedButton(
+                  onPressed: () async {
+                    Geolocator.getPositionStream()
+                        .listen((Position position) async {
+                      setState(() {
+                        global.lat = position.latitude;
+                        global.long = position.longitude;
+                      });
+                      List<Placemark> placemark =
+                          await placemarkFromCoordinates(
+                              global.lat, global.long);
+                      setState(() {
+                        current = placemark[0];
+                      });
+                    });
+                    setState(() {
+                      Navigator.of(context).pushNamed('map');
+                    });
+                  },
+                  child: Text("get loction"))
+            ],
+          ),
         ));
   }
 }
